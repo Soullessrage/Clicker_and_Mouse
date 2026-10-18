@@ -15,6 +15,10 @@ On first launch, the launcher creates a private `.venv` folder beside the app an
 
 To update an existing copy, click **Update & Restart** in the app. It downloads the latest files from the GitHub `main` branch, updates dependencies, and restarts the application. Keep an internet connection available and do not move or delete the extracted folder while updating.
 
+This GitHub repository is private, so the updater needs an authenticated GitHub session. The easiest option is to install [GitHub CLI](https://cli.github.com/), sign in once with `gh auth login`, and then use **Update & Restart**. Alternatively, set `NEON_MOUSE_CONTROLLER_GITHUB_TOKEN` to a fine-grained personal access token limited to this repository with **Contents: Read-only** permission. Keep tokens private; never put them in source files or share them in chat.
+
+If your installed updater reports HTTP 404, it is an older version that cannot authenticate. Download and extract the latest ZIP from GitHub one final time, then launch the updated copy. Later updates can use the in-app button.
+
 If your installed copy does not yet show **Appearance**, click **Update & Restart** once. The new editor and reset option will be available after the updated app reopens.
 
 Open **Appearance** in the main window to choose a preset, switch between light and dark mode, customize the surface and frame color for each section, change the drawing color, or select an XP, Pill, or Minimal toggle style. **Reset to Windows XP** restores the default theme and clears custom colors. Appearance choices are saved in your user settings folder and remain available after app updates.

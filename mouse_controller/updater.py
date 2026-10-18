@@ -8,10 +8,10 @@ import tempfile
 import zipfile
 from pathlib import Path, PurePosixPath
 from typing import Callable, List, Optional, Tuple
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-GITHUB_ARCHIVE_URL = "https://github.com/Soullessrage/Clicker_and_Mouse/archive/refs/heads/main.zip"
+GITHUB_ARCHIVE_URL = "https://api.github.com/repos/Soullessrage/Clicker_and_Mouse/zipball/main"
 MAX_ARCHIVE_SIZE = 64 * 1024 * 1024
 ROOT_FILES = {
     "README.md",
@@ -33,13 +33,30 @@ class GitHubUpdater:
     def update(self) -> None:
         """Download, validate, stage, and replace the latest allowlisted files."""
         self.on_status("Contacting GitHub...")
+        token = self._github_token()
+        if not token:
+            raise RuntimeError(
+                "This GitHub repository is private. Install GitHub CLI and sign in with `gh auth login`, "
+                "or set NEON_MOUSE_CONTROLLER_GITHUB_TOKEN to a fine-grained token with read-only Contents access."
+            )
         request = Request(
             GITHUB_ARCHIVE_URL,
-            headers={"User-Agent": "Neon-Mouse-Controller-Updater"},
+            headers={
+                "User-Agent": "Neon-Mouse-Controller-Updater",
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+            },
         )
         try:
             with urlopen(request, timeout=45) as response:
                 archive_data = response.read(MAX_ARCHIVE_SIZE + 1)
+        except HTTPError as error:
+            if error.code in (401, 403, 404):
+                raise RuntimeError(
+                    f"GitHub denied the update (HTTP {error.code}). Confirm the token can read "
+                    "the private repository's Contents and main branch."
+                ) from error
+            raise RuntimeError(f"Could not download the update: HTTP {error.code}") from error
         except (OSError, URLError) as error:
             raise RuntimeError(f"Could not download the update: {error}") from error
         if len(archive_data) > MAX_ARCHIVE_SIZE:
@@ -106,6 +123,34 @@ class GitHubUpdater:
             and relative.parts[0] == "mouse_controller"
             and relative.suffix == ".py"
         )
+
+    @staticmethod
+    def _github_token() -> Optional[str]:
+        for variable in (
+            "NEON_MOUSE_CONTROLLER_GITHUB_TOKEN",
+            "GH_TOKEN",
+            "GITHUB_TOKEN",
+        ):
+            token = os.environ.get(variable, "").strip()
+            if token:
+                return token
+
+        github_cli = shutil.which("gh")
+        if github_cli is None:
+            return None
+        try:
+            result = subprocess.run(
+                [github_cli, "auth", "token"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        if result.returncode == 0:
+            return result.stdout.strip() or None
+        return None
 
     @staticmethod
     def _install_dependencies(requirements: Path) -> None:
