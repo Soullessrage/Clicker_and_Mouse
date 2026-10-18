@@ -9,6 +9,7 @@ from neon_theme import (
     BORDER_COLORS,
     BUTTON_COLORS,
     CYAN,
+    CYAN_DIM,
     MUTED,
     PANEL,
     PANEL_HIGHLIGHT,
