@@ -1,5 +1,6 @@
 """Animated Tkinter controls used by the main window."""
 
+import math
 import tkinter as tk
 from tkinter import font as tkfont
 from typing import Callable, Optional
@@ -17,69 +18,109 @@ from neon_theme import (
 )
 
 
-def _make_glow_layers(master: tk.Misc, palette: tuple[str, ...]):
-    layers = []
-    parent = master
-    for index in range(3):
-        layer = tk.Frame(parent, background=palette[index])
-        layer.pack(fill=tk.BOTH, expand=True, padx=1 if index else 0, pady=1 if index else 0)
-        layers.append(layer)
-        parent = layer
-    return parent, layers
+def _draw_rounded_rect(
+    canvas: tk.Canvas,
+    x1: float,
+    y1: float,
+    x2: float,
+    y2: float,
+    radius: float,
+    fill: str,
+    tags: str = "surface",
+) -> None:
+    radius = max(0, min(radius, (x2 - x1) / 2, (y2 - y1) / 2))
+    corners = (
+        (x2 - radius, y1 + radius, -90),
+        (x2 - radius, y2 - radius, 0),
+        (x1 + radius, y2 - radius, 90),
+        (x1 + radius, y1 + radius, 180),
+    )
+    points = []
+    for center_x, center_y, start_angle in corners:
+        for step in range(9):
+            angle = math.radians(start_angle + step * 90 / 8)
+            points.extend((
+                center_x + radius * math.cos(angle),
+                center_y + radius * math.sin(angle),
+            ))
+    canvas.create_polygon(*points, fill=fill, outline=fill, smooth=True, splinesteps=24, tags=tags)
 
 
-class NeonGlowButton(tk.Frame):
-    """A flat button whose border color softly cycles while it is visible."""
+class NeonGlowButton(tk.Canvas):
+    """A rounded canvas button with a restrained animated accent rim."""
 
     def __init__(self, master: tk.Misc, text: str, command: Callable[[], None], **kwargs):
         self._glow_index = 0
         self._glow_job: Optional[str] = None
         self._normal_background = kwargs.pop("background", PANEL_HIGHLIGHT)
+        self._text = text
+        self._command = command
+        self._hovered = False
+        parent_background = master.cget("background")
         super().__init__(
             master,
-            background=self._normal_background,
+            width=kwargs.pop("width", 132),
+            height=kwargs.pop("height", 42),
+            background=parent_background,
             highlightthickness=0,
-        )
-        button_parent, self._glow_layers = _make_glow_layers(self, BORDER_COLORS)
-        self.button = tk.Button(
-            button_parent,
-            text=text,
-            command=command,
-            background=self._normal_background,
-            foreground=TEXT,
-            activebackground=PANEL,
-            activeforeground=CYAN,
-            disabledforeground=MUTED,
-            relief=tk.FLAT,
-            borderwidth=0,
-            padx=12,
-            pady=8,
+            bd=0,
             cursor="hand2",
-            font=(tkfont.nametofont("TkDefaultFont").actual("family"), 10, "bold"),
+            takefocus=True,
             **kwargs,
         )
-        self.button.pack(fill=tk.BOTH, expand=True, padx=1, pady=1)
-        for widget in [self.button, *self._glow_layers]:
-            widget.bind("<Enter>", self._on_enter, add="+")
-            widget.bind("<Leave>", self._on_leave, add="+")
+        self._font = tkfont.Font(
+            self,
+            family=tkfont.nametofont("TkDefaultFont").actual("family"),
+            size=10,
+            weight="bold",
+        )
+        self.bind("<Configure>", self._draw, add="+")
+        self.bind("<Enter>", self._on_enter, add="+")
+        self.bind("<Leave>", self._on_leave, add="+")
+        self.bind("<Button-1>", self._invoke, add="+")
+        self.bind("<Return>", self._invoke, add="+")
+        self.bind("<space>", self._invoke, add="+")
         self.bind("<Destroy>", self._on_destroy, add="+")
         self._animate_glow()
+
+    def _draw(self, _event: Optional[tk.Event] = None) -> None:
+        width = self.winfo_width()
+        height = self.winfo_height()
+        if width < 2 or height < 2:
+            return
+        self.delete("surface")
+        for depth, inset in enumerate((0, 1, 3)):
+            color = BUTTON_COLORS[(self._glow_index + depth * 2) % len(BUTTON_COLORS)]
+            _draw_rounded_rect(self, inset, inset, width - inset - 1, height - inset - 1, 12, color)
+        face = PANEL_HIGHLIGHT if self._hovered else self._normal_background
+        _draw_rounded_rect(self, 5, 5, width - 6, height - 6, 10, face)
+        self.create_text(
+            width / 2,
+            height / 2,
+            text=self._text,
+            fill=CYAN if self._hovered else TEXT,
+            font=self._font,
+            tags="surface",
+        )
+
+    def _invoke(self, _event: tk.Event) -> None:
+        if self._command is not None:
+            self._command()
 
     def _animate_glow(self) -> None:
         if not self.winfo_exists():
             return
-        palette = BUTTON_COLORS
-        for depth, layer in enumerate(self._glow_layers):
-            color_index = min(self._glow_index + depth, len(palette) - 1)
-            layer.configure(background=palette[color_index])
         self._glow_index = (self._glow_index + 1) % len(BUTTON_COLORS)
-        self._glow_job = self.after(130, self._animate_glow)
+        self._draw()
+        self._glow_job = self.after(240, self._animate_glow)
 
     def _on_enter(self, _event: tk.Event) -> None:
-        self.button.configure(background=PURPLE)
+        self._hovered = True
+        self._draw()
 
     def _on_leave(self, _event: tk.Event) -> None:
-        self.button.configure(background=self._normal_background)
+        self._hovered = False
+        self._draw()
 
     def _on_destroy(self, _event: tk.Event) -> None:
         if self._glow_job is not None:
@@ -183,40 +224,77 @@ class NeonToggle(tk.Canvas):
                 pass
 
 
-class NeonBorderFrame(tk.Frame):
-    """A padded frame with an animated neon outline."""
+class NeonBorderFrame(tk.Canvas):
+    """A rounded panel with a soft animated edge and regular Tk content."""
 
     def __init__(self, master: tk.Misc, title: str, **kwargs):
         background = kwargs.pop("background", PANEL)
-        super().__init__(master, background=background, highlightthickness=0, **kwargs)
+        height = kwargs.pop("height", 270)
+        parent_background = master.cget("background")
+        super().__init__(
+            master,
+            background=parent_background,
+            width=320,
+            height=height,
+            highlightthickness=0,
+            bd=0,
+            **kwargs,
+        )
         self._border_index = 0
         self._border_job: Optional[str] = None
-        content_parent, self._glow_layers = _make_glow_layers(self, BORDER_COLORS)
-        content_parent.configure(background=background)
+        self._panel_background = background
+        self._content_frame = tk.Frame(self, background=background)
+        self._content_window = self.create_window(
+            8,
+            8,
+            anchor="nw",
+            window=self._content_frame,
+            width=1,
+            height=1,
+            tags="content-window",
+        )
         self.title_label = tk.Label(
-            content_parent,
-            text=title.upper(),
+            self._content_frame,
+            text=title,
             background=background,
             foreground=CYAN,
             anchor="w",
-            font=(tkfont.nametofont("TkDefaultFont").actual("family"), 9, "bold"),
-            padx=12,
-            pady=9,
+            font=(tkfont.nametofont("TkDefaultFont").actual("family"), 10, "bold"),
+            padx=14,
+            pady=10,
         )
         self.title_label.pack(fill=tk.X)
-        self.content = tk.Frame(content_parent, background=background, padx=12, pady=8)
+        self.content = tk.Frame(self._content_frame, background=background, padx=14, pady=10)
         self.content.pack(fill=tk.BOTH, expand=True)
+        self.bind("<Configure>", self._draw_surface, add="+")
         self.bind("<Destroy>", self._on_destroy, add="+")
+        self.after_idle(self._draw_surface)
         self._animate_border()
+
+    def _draw_surface(self, _event: Optional[tk.Event] = None) -> None:
+        width = self.winfo_width()
+        height = self.winfo_height()
+        if width < 2 or height < 2:
+            return
+        self.delete("surface")
+        for depth, inset in enumerate((0, 1, 3)):
+            color = BORDER_COLORS[(self._border_index + depth * 2) % len(BORDER_COLORS)]
+            _draw_rounded_rect(self, inset, inset, width - inset - 1, height - inset - 1, 17, color)
+        _draw_rounded_rect(self, 5, 5, width - 6, height - 6, 14, self._panel_background)
+        self.coords(self._content_window, 9, 9)
+        self.itemconfigure(
+            self._content_window,
+            width=max(1, width - 18),
+            height=max(1, height - 18),
+        )
+        self.tag_lower("surface")
 
     def _animate_border(self) -> None:
         if not self.winfo_exists():
             return
-        for depth, layer in enumerate(self._glow_layers):
-            color_index = min(self._border_index + depth, len(BORDER_COLORS) - 1)
-            layer.configure(background=BORDER_COLORS[color_index])
         self._border_index = (self._border_index + 1) % len(BORDER_COLORS)
-        self._border_job = self.after(150, self._animate_border)
+        self._draw_surface()
+        self._border_job = self.after(420, self._animate_border)
 
     def _on_destroy(self, _event: tk.Event) -> None:
         if self._border_job is not None:
@@ -226,8 +304,8 @@ class NeonBorderFrame(tk.Frame):
                 pass
 
 
-class NeonSlider(tk.Frame):
-    """Labeled Tk scale with an animated neon frame and numeric readout."""
+class NeonSlider(tk.Canvas):
+    """A rounded, softly lit Tk scale with a live value readout."""
 
     def __init__(
         self,
@@ -241,14 +319,32 @@ class NeonSlider(tk.Frame):
         **kwargs,
     ):
         background = kwargs.pop("background", PANEL)
-        super().__init__(master, background=background, highlightthickness=0, **kwargs)
+        parent_background = master.cget("background")
+        super().__init__(
+            master,
+            background=parent_background,
+            width=320,
+            height=66,
+            highlightthickness=0,
+            bd=0,
+            **kwargs,
+        )
         self._color_index = 0
         self._glow_job: Optional[str] = None
         self._command = command
-        content_parent, self._glow_layers = _make_glow_layers(self, SLIDER_COLORS)
-        content_parent.configure(background=background)
+        self._panel_background = background
+        self._content_frame = tk.Frame(self, background=background)
+        self._content_window = self.create_window(
+            7,
+            7,
+            anchor="nw",
+            window=self._content_frame,
+            width=1,
+            height=1,
+            tags="content-window",
+        )
         self._value_label = tk.Label(
-            content_parent,
+            self._content_frame,
             text=f"{initial:g}",
             background=background,
             foreground=CYAN,
@@ -257,7 +353,7 @@ class NeonSlider(tk.Frame):
             anchor="e",
         )
         tk.Label(
-            content_parent,
+            self._content_frame,
             text=label,
             background=background,
             foreground=TEXT,
@@ -265,7 +361,7 @@ class NeonSlider(tk.Frame):
         ).grid(row=0, column=0, sticky="ew")
         self._value_label.grid(row=0, column=1, sticky="e")
         self.scale = tk.Scale(
-            content_parent,
+            self._content_frame,
             from_=from_,
             to=to,
             resolution=resolution,
@@ -283,9 +379,11 @@ class NeonSlider(tk.Frame):
             cursor="hand2",
         )
         self.scale.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(3, 0))
-        content_parent.columnconfigure(0, weight=1)
+        self._content_frame.columnconfigure(0, weight=1)
         self.scale.set(initial)
+        self.bind("<Configure>", self._draw_surface, add="+")
         self.bind("<Destroy>", self._on_destroy, add="+")
+        self.after_idle(self._draw_surface)
         self._animate_glow()
 
     def get(self) -> float:
@@ -303,11 +401,27 @@ class NeonSlider(tk.Frame):
     def _animate_glow(self) -> None:
         if not self.winfo_exists():
             return
-        for depth, layer in enumerate(self._glow_layers):
-            color_index = min(self._color_index + depth, len(SLIDER_COLORS) - 1)
-            layer.configure(background=SLIDER_COLORS[color_index])
         self._color_index = (self._color_index + 1) % len(SLIDER_COLORS)
-        self._glow_job = self.after(140, self._animate_glow)
+        self._draw_surface()
+        self._glow_job = self.after(360, self._animate_glow)
+
+    def _draw_surface(self, _event: Optional[tk.Event] = None) -> None:
+        width = self.winfo_width()
+        height = self.winfo_height()
+        if width < 2 or height < 2:
+            return
+        self.delete("surface")
+        for depth, inset in enumerate((0, 1, 3)):
+            color = SLIDER_COLORS[(self._color_index + depth * 2) % len(SLIDER_COLORS)]
+            _draw_rounded_rect(self, inset, inset, width - inset - 1, height - inset - 1, 13, color)
+        _draw_rounded_rect(self, 5, 5, width - 6, height - 6, 10, self._panel_background)
+        self.coords(self._content_window, 9, 8)
+        self.itemconfigure(
+            self._content_window,
+            width=max(1, width - 18),
+            height=max(1, height - 16),
+        )
+        self.tag_lower("surface")
 
     def _on_destroy(self, _event: tk.Event) -> None:
         if self._glow_job is not None:
