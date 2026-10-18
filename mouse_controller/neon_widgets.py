@@ -265,7 +265,7 @@ class NeonSlider(tk.Frame):
         ).grid(row=0, column=0, sticky="ew")
         self._value_label.grid(row=0, column=1, sticky="e")
         self.scale = tk.Scale(
-            self,
+            content_parent,
             from_=from_,
             to=to,
             resolution=resolution,
