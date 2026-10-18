@@ -1,10 +1,10 @@
 """Separate editor window for application themes and section colors."""
 
 import tkinter as tk
-from tkinter import colorchooser, messagebox, ttk
+from tkinter import colorchooser, font as tkfont, messagebox, ttk
 from typing import Callable
 
-from theme_manager import PRESETS, SECTIONS, TOGGLE_STYLES, ThemeManager
+from theme_manager import BOX_STYLES, PRESETS, SECTIONS, TOGGLE_STYLES, ThemeManager
 
 
 class AppearanceEditor:
@@ -25,6 +25,8 @@ class AppearanceEditor:
         self.preset_var = tk.StringVar(value=self.theme.preset)
         self.mode_var = tk.StringVar(value=self.theme.mode.title())
         self.toggle_var = tk.StringVar(value=self.theme.toggle_style)
+        self.box_var = tk.StringVar(value=self.theme.box_style)
+        self.font_var = tk.StringVar(value=self.theme.font_family)
         self._build()
         self._refresh_swatches()
         self.window.grab_set()
@@ -45,6 +47,7 @@ class AppearanceEditor:
             arrowcolor=colors["accent"],
             bordercolor=colors["accent"],
             padding=6,
+            font=self._font(10),
         )
         style.map(
             "Appearance.TCombobox",
@@ -59,13 +62,14 @@ class AppearanceEditor:
             text="Appearance",
             background=colors["background"],
             foreground=colors["text"],
-            font=("TkDefaultFont", 18, "bold"),
+            font=self._font(18, "bold"),
         ).pack(anchor="w")
         tk.Label(
             outer,
             text="Choose a preset, then fine-tune each surface and path color.",
             background=colors["background"],
             foreground=colors["muted"],
+            font=self._font(10),
             wraplength=450,
             justify=tk.LEFT,
         ).pack(anchor="w", pady=(4, 16))
@@ -111,6 +115,48 @@ class AppearanceEditor:
         )
         toggle_box.pack(side=tk.RIGHT)
         toggle_box.bind("<<ComboboxSelected>>", self._on_toggle_style)
+
+        box_row = tk.Frame(outer, background=colors["background"])
+        box_row.pack(fill=tk.X, pady=4)
+        self._label(box_row, "Section and button shape", colors).pack(side=tk.LEFT)
+        box_box = ttk.Combobox(
+            box_row,
+            textvariable=self.box_var,
+            values=BOX_STYLES,
+            state="readonly",
+            width=20,
+            style="Appearance.TCombobox",
+        )
+        box_box.pack(side=tk.RIGHT)
+        box_box.bind("<<ComboboxSelected>>", self._on_box_style)
+
+        font_row = tk.Frame(outer, background=colors["background"])
+        font_row.pack(fill=tk.X, pady=4)
+        self._label(font_row, "Font family", colors).pack(side=tk.LEFT)
+        available_fonts = set(tkfont.families(self.window))
+        common_fonts = (
+            "Tahoma",
+            "Segoe UI",
+            "Arial",
+            "Verdana",
+            "Trebuchet MS",
+            "Georgia",
+            "Consolas",
+            "Courier New",
+        )
+        font_choices = ["System Default"] + [name for name in common_fonts if name in available_fonts]
+        if self.theme.font_family not in font_choices:
+            font_choices.append(self.theme.font_family)
+        font_box = ttk.Combobox(
+            font_row,
+            textvariable=self.font_var,
+            values=font_choices,
+            state="readonly",
+            width=20,
+            style="Appearance.TCombobox",
+        )
+        font_box.pack(side=tk.RIGHT)
+        font_box.bind("<<ComboboxSelected>>", self._on_font_family)
 
         self._section = tk.Frame(
             outer,
@@ -197,7 +243,14 @@ class AppearanceEditor:
             text=text,
             background=colors["background"],
             foreground=colors["text"],
+            font=self._font(10),
         )
+
+    def _font(self, size: int, weight: str = "normal"):
+        family = self.theme.font_family
+        if family == "System Default":
+            family = tkfont.nametofont("TkDefaultFont").actual("family")
+        return (family, size, weight)
 
     def _on_preset(self, _event: tk.Event) -> None:
         self.theme.set_preset(self.preset_var.get())
@@ -211,6 +264,14 @@ class AppearanceEditor:
 
     def _on_toggle_style(self, _event: tk.Event) -> None:
         self.theme.set_toggle_style(self.toggle_var.get())
+        self._apply()
+
+    def _on_box_style(self, _event: tk.Event) -> None:
+        self.theme.set_box_style(self.box_var.get())
+        self._apply()
+
+    def _on_font_family(self, _event: tk.Event) -> None:
+        self.theme.set_font_family(self.font_var.get())
         self._apply()
 
     def _choose_section_color(self, key: str) -> None:
@@ -257,6 +318,8 @@ class AppearanceEditor:
         self.preset_var.set(self.theme.preset)
         self.mode_var.set(self.theme.mode.title())
         self.toggle_var.set(self.theme.toggle_style)
+        self.box_var.set(self.theme.box_style)
+        self.font_var.set(self.theme.font_family)
         for child in self.window.winfo_children():
             child.destroy()
         self._build()
@@ -274,6 +337,8 @@ class AppearanceEditor:
         self.preset_var.set(self.theme.preset)
         self.mode_var.set(self.theme.mode.title())
         self.toggle_var.set(self.theme.toggle_style)
+        self.box_var.set(self.theme.box_style)
+        self.font_var.set(self.theme.font_family)
         self._refresh_swatches()
         self._apply()
 

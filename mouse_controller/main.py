@@ -1,9 +1,10 @@
 """Entry point and application controller for Neon Mouse Controller."""
 
-import tkinter as tk
 import subprocess
 import sys
 import threading
+import tkinter as tk
+from tkinter import font as tkfont
 from tkinter import messagebox
 from pathlib import Path
 from typing import Callable, List, Optional, Tuple
@@ -78,7 +79,7 @@ class NeonMouseControllerApp:
             text="NEON MOUSE CONTROLLER",
             background=colors["background"],
             foreground=colors["accent"],
-            font=("TkDefaultFont", 17, "bold"),
+            font=self._font(17, "bold"),
         ).pack(anchor="w")
         tk.Label(
             header,
@@ -89,7 +90,7 @@ class NeonMouseControllerApp:
             ),
             background=colors["background"],
             foreground=colors["muted"],
-            font=("TkDefaultFont", 9),
+            font=self._font(9),
             wraplength=810,
             justify=tk.LEFT,
         ).pack(anchor="w", pady=(4, 0))
@@ -111,7 +112,13 @@ class NeonMouseControllerApp:
         click_section.grid(row=0, column=0, sticky="nsew", padx=(0, 7), pady=(0, 12))
         click_row = tk.Frame(click_section.content, background=click_colors["panel"])
         click_row.pack(fill=tk.X, pady=(0, 10))
-        tk.Label(click_row, text="Clicking", background=click_colors["panel"], foreground=click_colors["text"]).pack(side=tk.LEFT)
+        tk.Label(
+            click_row,
+            text="Clicking",
+            background=click_colors["panel"],
+            foreground=click_colors["text"],
+            font=self._font(10),
+        ).pack(side=tk.LEFT)
         self.click_toggle = NeonToggle(
             click_row,
             command=self._on_click_toggle,
@@ -137,7 +144,13 @@ class NeonMouseControllerApp:
         path_section.grid(row=0, column=1, sticky="nsew", padx=(7, 0), pady=(0, 12))
         path_row = tk.Frame(path_section.content, background=path_colors["panel"])
         path_row.pack(fill=tk.X, pady=(0, 10))
-        tk.Label(path_row, text="Following", background=path_colors["panel"], foreground=path_colors["text"]).pack(side=tk.LEFT)
+        tk.Label(
+            path_row,
+            text="Following",
+            background=path_colors["panel"],
+            foreground=path_colors["text"],
+            font=self._font(10),
+        ).pack(side=tk.LEFT)
         self.path_toggle = NeonToggle(
             path_row,
             command=self._on_path_toggle,
@@ -201,6 +214,7 @@ class NeonMouseControllerApp:
             text="Draw a stroke; its canvas position will scale across the full display.",
             background=canvas_colors["panel"],
             foreground=canvas_colors["muted"],
+            font=self._font(10),
             anchor="w",
         ).pack(fill=tk.X, pady=(0, 8))
         self.path_canvas = PathCanvas(draw_section.content, theme=self.theme)
@@ -230,7 +244,7 @@ class NeonMouseControllerApp:
             background=colors["background"],
             foreground=colors["muted"],
             anchor="w",
-            font=("TkDefaultFont", 9),
+            font=self._font(9),
             wraplength=710,
         )
         self.status_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
@@ -264,6 +278,12 @@ class NeonMouseControllerApp:
 
     def _theme_color(self, key: str, section: Optional[str] = None) -> str:
         return self.theme.colors(section)[key]
+
+    def _font(self, size: int, weight: Optional[str] = None):
+        family = self.theme.font_family
+        if family == "System Default":
+            family = tkfont.nametofont("TkDefaultFont").actual("family")
+        return (family, size, weight) if weight else (family, size)
 
     def _start_update(self) -> None:
         if self._updating:

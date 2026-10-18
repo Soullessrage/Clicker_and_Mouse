@@ -43,6 +43,10 @@ PRESETS = {
         "light": _palette("#ECE9D8", "#F7F5EC", "#FFFFFF", "#17243A", "#59677A", "#1768D2", "#75B5F5", "#C3262D", "#CBD5E3", "#1768D2"),
         "dark": _palette("#171C25", "#222A36", "#2B3543", "#F0F3F7", "#AAB5C4", "#62A9FF", "#A6D2FF", "#FF727A", "#394657", "#62A9FF"),
     },
+    "Windows 11": {
+        "light": _palette("#F3F3F3", "#FFFFFF", "#F8F8F8", "#202020", "#666666", "#0067C0", "#60CDFF", "#C42B1C", "#E5E5E5", "#0067C0"),
+        "dark": _palette("#202020", "#2B2B2B", "#353535", "#F5F5F5", "#B9B9B9", "#60CDFF", "#9ADCFB", "#FF7B72", "#454545", "#60CDFF"),
+    },
     "Midnight": {
         "light": _palette("#E8EDF2", "#F4F7FA", "#FFFFFF", "#1C2836", "#687789", "#365D9A", "#7396C7", "#C94C68", "#CED8E3", "#365D9A"),
         "dark": _palette("#101720", "#19232F", "#222F3D", "#E9F0F7", "#9CAFC1", "#83B8FF", "#B5D5FF", "#FF758A", "#334252", "#83B8FF"),
@@ -55,6 +59,18 @@ PRESETS = {
         "light": _palette("#F4EDE7", "#FBF6F1", "#FFFFFF", "#38291F", "#7B695C", "#B86638", "#E3A16D", "#B83F55", "#DFD0C2", "#B86638"),
         "dark": _palette("#1D1716", "#2B211F", "#382925", "#F6EDE8", "#BDA89C", "#F09A68", "#FFC28E", "#FF7180", "#4B3932", "#F09A68"),
     },
+    "Dragon's Hoard": {
+        "light": _palette("#E9DFC9", "#F7F0DF", "#FFF9E9", "#33271D", "#75624B", "#8C5A22", "#D8A64E", "#9A3535", "#D4C6AA", "#8C5A22"),
+        "dark": _palette("#191611", "#282117", "#382D1C", "#F2E4C6", "#B3A17F", "#D8A64E", "#EACB78", "#D96454", "#4B3B25", "#D8A64E"),
+    },
+    "Arcane": {
+        "light": _palette("#E8E5F0", "#F6F3FA", "#FFFFFF", "#292139", "#716783", "#6745A5", "#A181D1", "#B74668", "#D8D0E4", "#6745A5"),
+        "dark": _palette("#17131F", "#221B2D", "#30253E", "#F2ECFA", "#B5A9C5", "#BB9AF7", "#D9C2FF", "#FF7C9A", "#443553", "#BB9AF7"),
+    },
+    "Cyberpunk": {
+        "light": _palette("#E8EEF2", "#F6FAFC", "#FFFFFF", "#1B2832", "#637783", "#007E87", "#00AEB2", "#D83E67", "#C9D8DE", "#007E87"),
+        "dark": _palette("#10171D", "#18232A", "#213139", "#E8F5F6", "#9DB3B7", "#5FE3D0", "#B0F7E9", "#FF527A", "#30434A", "#5FE3D0"),
+    },
 }
 
 SECTIONS = {
@@ -62,7 +78,8 @@ SECTIONS = {
     "Path Follower": "path",
     "Draw Path": "canvas",
 }
-TOGGLE_STYLES = ("XP", "Pill", "Minimal")
+TOGGLE_STYLES = ("XP", "Pill", "Minimal", "Switch", "Checkbox")
+BOX_STYLES = ("Soft Rounded", "Windows XP", "Square", "Outlined")
 DEFAULT_PRESET = "Windows XP"
 
 
@@ -75,6 +92,8 @@ class ThemeManager:
             "preset": DEFAULT_PRESET,
             "mode": "light",
             "toggle_style": "XP",
+            "box_style": "Windows XP",
+            "font_family": "System Default",
             "section_overrides": {},
             "path_color": None,
         }
@@ -101,6 +120,14 @@ class ThemeManager:
     @property
     def toggle_style(self) -> str:
         return self.settings["toggle_style"]
+
+    @property
+    def box_style(self) -> str:
+        return self.settings["box_style"]
+
+    @property
+    def font_family(self) -> str:
+        return self.settings["font_family"]
 
     def colors(self, section: Optional[str] = None) -> ColorMap:
         colors = dict(PRESETS[self.preset][self.mode])
@@ -131,6 +158,7 @@ class ThemeManager:
         if preset not in PRESETS:
             raise ValueError(f"Unknown theme preset: {preset}")
         self.settings["preset"] = preset
+        self.settings["box_style"] = "Windows XP" if preset == "Windows XP" else "Soft Rounded"
         self.settings["section_overrides"] = {}
         self.settings["path_color"] = None
         self.save()
@@ -145,6 +173,19 @@ class ThemeManager:
         if style not in TOGGLE_STYLES:
             raise ValueError(f"Unknown toggle style: {style}")
         self.settings["toggle_style"] = style
+        self.save()
+
+    def set_box_style(self, style: str) -> None:
+        if style not in BOX_STYLES:
+            raise ValueError(f"Unknown box style: {style}")
+        self.settings["box_style"] = style
+        self.save()
+
+    def set_font_family(self, family: str) -> None:
+        family = family.strip()
+        if not family or len(family) > 64:
+            raise ValueError("Choose a valid installed font")
+        self.settings["font_family"] = family
         self.save()
 
     def set_section_color(self, section: str, key: str, color: str) -> None:
@@ -164,6 +205,8 @@ class ThemeManager:
             "preset": DEFAULT_PRESET,
             "mode": "light",
             "toggle_style": "XP",
+            "box_style": "Windows XP",
+            "font_family": "System Default",
             "section_overrides": {},
             "path_color": None,
         }
@@ -185,12 +228,18 @@ class ThemeManager:
         preset = saved.get("preset")
         mode = saved.get("mode")
         style = saved.get("toggle_style")
+        box_style = saved.get("box_style")
+        font_family = saved.get("font_family")
         if preset in PRESETS:
             self.settings["preset"] = preset
         if mode in ("light", "dark"):
             self.settings["mode"] = mode
         if style in TOGGLE_STYLES:
             self.settings["toggle_style"] = style
+        if box_style in BOX_STYLES:
+            self.settings["box_style"] = box_style
+        if isinstance(font_family, str) and font_family.strip() and len(font_family) <= 64:
+            self.settings["font_family"] = font_family.strip()
         saved_overrides = saved.get("section_overrides", {})
         if not isinstance(saved_overrides, dict):
             saved_overrides = {}
