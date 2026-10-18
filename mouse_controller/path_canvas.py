@@ -3,7 +3,7 @@
 import tkinter as tk
 from typing import List, Tuple
 
-from neon_theme import BACKGROUND, CYAN, PURPLE
+from neon_theme import BACKGROUND, CYAN
 
 Point = Tuple[int, int]
 
@@ -11,11 +11,16 @@ Point = Tuple[int, int]
 class PathCanvas(tk.Frame):
     """Capture drag strokes in canvas coordinates and convert them to screen points."""
 
-    def __init__(self, master: tk.Misc, **kwargs):
-        super().__init__(master, background=CYAN, padx=2, pady=2, **kwargs)
+    def __init__(self, master: tk.Misc, theme=None, **kwargs):
+        self._theme = theme
+        colors = theme.colors("canvas") if theme is not None else None
+        self._path_color = theme.path_color() if theme is not None else CYAN
+        frame_background = colors["accent"] if colors else CYAN
+        canvas_background = colors["panel"] if colors else BACKGROUND
+        super().__init__(master, background=frame_background, padx=2, pady=2, **kwargs)
         self.canvas = tk.Canvas(
             self,
-            background=BACKGROUND,
+            background=canvas_background,
             highlightthickness=0,
             height=190,
             cursor="crosshair",
@@ -61,8 +66,8 @@ class PathCanvas(tk.Frame):
             event.y - 2,
             event.x + 2,
             event.y + 2,
-            fill=CYAN,
-            outline=CYAN,
+            fill=self._path_color,
+            outline=self._path_color,
             tags="stroke",
         )
 
@@ -79,7 +84,7 @@ class PathCanvas(tk.Frame):
             previous[1],
             point[0],
             point[1],
-            fill=CYAN,
+            fill=self._path_color,
             width=3,
             capstyle=tk.ROUND,
             joinstyle=tk.ROUND,
@@ -90,8 +95,8 @@ class PathCanvas(tk.Frame):
             point[1] - 2,
             point[0] + 2,
             point[1] + 2,
-            fill=PURPLE,
-            outline=PURPLE,
+            fill=self._path_color,
+            outline=self._path_color,
             tags="stroke",
         )
 

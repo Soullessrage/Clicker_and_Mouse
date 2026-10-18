@@ -18,6 +18,26 @@ from neon_theme import (
 )
 
 
+def _get_colors(theme, section: Optional[str] = None):
+    if theme is not None:
+        return theme.colors(section)
+    return {
+        "background": "#0b0f14",
+        "panel": PANEL,
+        "panel_highlight": PANEL_HIGHLIGHT,
+        "text": TEXT,
+        "muted": MUTED,
+        "accent": CYAN,
+        "accent_alt": PURPLE,
+        "track": "#26334d",
+        "thumb": "#a3b2c5",
+    }
+
+
+def _get_glow_colors(theme, section: Optional[str], fallback):
+    return theme.glow_colors(section) if theme is not None else fallback
+
+
 def _draw_rounded_rect(
     canvas: tk.Canvas,
     x1: float,
@@ -52,7 +72,10 @@ class NeonGlowButton(tk.Canvas):
     def __init__(self, master: tk.Misc, text: str, command: Callable[[], None], **kwargs):
         self._glow_index = 0
         self._glow_job: Optional[str] = None
-        self._normal_background = kwargs.pop("background", PANEL_HIGHLIGHT)
+        self._theme = kwargs.pop("theme", None)
+        self._section = kwargs.pop("section", None)
+        colors = _get_colors(self._theme, self._section)
+        self._normal_background = kwargs.pop("background", colors["panel_highlight"])
         self._text = text
         self._command = command
         self._hovered = False
@@ -89,16 +112,18 @@ class NeonGlowButton(tk.Canvas):
         if width < 2 or height < 2:
             return
         self.delete("surface")
+        colors = _get_colors(self._theme, self._section)
+        glow_colors = _get_glow_colors(self._theme, self._section, BUTTON_COLORS)
         for depth, inset in enumerate((0, 1, 3)):
-            color = BUTTON_COLORS[(self._glow_index + depth * 2) % len(BUTTON_COLORS)]
+            color = glow_colors[(self._glow_index + depth * 2) % len(glow_colors)]
             _draw_rounded_rect(self, inset, inset, width - inset - 1, height - inset - 1, 12, color)
-        face = PANEL_HIGHLIGHT if self._hovered else self._normal_background
+        face = colors["panel_highlight"] if self._hovered else self._normal_background
         _draw_rounded_rect(self, 5, 5, width - 6, height - 6, 10, face)
         self.create_text(
             width / 2,
             height / 2,
             text=self._text,
-            fill=CYAN if self._hovered else TEXT,
+            fill=colors["accent"] if self._hovered else colors["text"],
             font=self._font,
             tags="surface",
         )
@@ -110,7 +135,7 @@ class NeonGlowButton(tk.Canvas):
     def _animate_glow(self) -> None:
         if not self.winfo_exists():
             return
-        self._glow_index = (self._glow_index + 1) % len(BUTTON_COLORS)
+        self._glow_index = (self._glow_index + 1) % len(_get_glow_colors(self._theme, self._section, BUTTON_COLORS))
         self._draw()
         self._glow_job = self.after(240, self._animate_glow)
 
@@ -140,11 +165,17 @@ class NeonToggle(tk.Canvas):
         initial: bool = False,
         **kwargs,
     ):
+        self._theme = kwargs.pop("theme", None)
+        self._section = kwargs.pop("section", None)
+        self._style = kwargs.pop("style", self._theme.toggle_style if self._theme else "Pill")
+        colors = _get_colors(self._theme, self._section)
+        dimensions = {"XP": (62, 30), "Pill": (58, 30), "Minimal": (58, 30)}
+        width, height = dimensions.get(self._style, dimensions["Pill"])
         super().__init__(
             master,
-            width=58,
-            height=30,
-            background=kwargs.pop("background", PANEL),
+            width=width,
+            height=height,
+            background=kwargs.pop("background", colors["panel"]),
             highlightthickness=0,
             bd=0,
             **kwargs,
@@ -190,26 +221,44 @@ class NeonToggle(tk.Canvas):
 
     def _draw(self) -> None:
         self.delete("all")
-        color = CYAN if self._value else "#42516a"
+        colors = _get_colors(self._theme, self._section)
+        color = colors["accent"] if self._value else colors["track"]
         if not self._enabled:
-            color = "#354155"
-        self.create_oval(2, 2, 56, 28, fill="#0a1020", outline=color, width=2)
-        knob_x = 40 if self._value else 18
-        knob_color = color if self._value else "#a3b2c5"
-        self.create_oval(knob_x - 8, 7, knob_x + 8, 23, fill=knob_color, outline="")
+            color = colors["muted"]
+        if self._style == "XP":
+            self.create_rectangle(3, 4, 59, 26, fill=colors["panel_highlight"], outline=colors["muted"])
+            knob_x = 46 if self._value else 16
+            self.create_rectangle(knob_x - 9, 6, knob_x + 9, 24, fill=color, outline=colors["panel"])
+            self.create_line(knob_x - 6, 8, knob_x + 6, 8, fill=colors["text"])
+        elif self._style == "Minimal":
+            self.create_line(13, 15, 45, 15, fill=color, width=4, capstyle=tk.ROUND)
+            knob_x = 43 if self._value else 15
+            self.create_oval(knob_x - 7, 8, knob_x + 7, 22, fill=colors["panel_highlight"], outline=color, width=2)
+        else:
+            _draw_rounded_rect(self, 2, 2, 56, 28, 13, color, tags="toggle-track")
+            knob_x = 42 if self._value else 16
+            self.create_oval(
+                knob_x - 8,
+                7,
+                knob_x + 8,
+                23,
+                fill=colors["panel_highlight"],
+                outline=colors["text"] if self._value else colors["muted"],
+            )
 
     def _animate(self) -> None:
         if not self.winfo_exists():
             return
         if self._value and self._enabled:
-            self._pulse_index = (self._pulse_index + 1) % len(SLIDER_COLORS)
+            glow_colors = _get_glow_colors(self._theme, self._section, SLIDER_COLORS)
+            self._pulse_index = (self._pulse_index + 1) % len(glow_colors)
             self.delete("pulse")
             self.create_oval(
                 1,
                 1,
                 57,
                 29,
-                outline=SLIDER_COLORS[self._pulse_index],
+                outline=glow_colors[self._pulse_index],
                 width=1,
                 tags="pulse",
             )
@@ -228,7 +277,10 @@ class NeonBorderFrame(tk.Canvas):
     """A rounded panel with a soft animated edge and regular Tk content."""
 
     def __init__(self, master: tk.Misc, title: str, **kwargs):
-        background = kwargs.pop("background", PANEL)
+        self._theme = kwargs.pop("theme", None)
+        self._section = kwargs.pop("section", None)
+        colors = _get_colors(self._theme, self._section)
+        background = kwargs.pop("background", colors["panel"])
         height = kwargs.pop("height", 270)
         parent_background = master.cget("background")
         super().__init__(
@@ -257,7 +309,7 @@ class NeonBorderFrame(tk.Canvas):
             self._content_frame,
             text=title,
             background=background,
-            foreground=CYAN,
+            foreground=colors["accent"],
             anchor="w",
             font=(tkfont.nametofont("TkDefaultFont").actual("family"), 10, "bold"),
             padx=14,
@@ -278,7 +330,8 @@ class NeonBorderFrame(tk.Canvas):
             return
         self.delete("surface")
         for depth, inset in enumerate((0, 1, 3)):
-            color = BORDER_COLORS[(self._border_index + depth * 2) % len(BORDER_COLORS)]
+            glow_colors = _get_glow_colors(self._theme, self._section, BORDER_COLORS)
+            color = glow_colors[(self._border_index + depth * 2) % len(glow_colors)]
             _draw_rounded_rect(self, inset, inset, width - inset - 1, height - inset - 1, 17, color)
         _draw_rounded_rect(self, 5, 5, width - 6, height - 6, 14, self._panel_background)
         self.coords(self._content_window, 9, 9)
@@ -292,7 +345,9 @@ class NeonBorderFrame(tk.Canvas):
     def _animate_border(self) -> None:
         if not self.winfo_exists():
             return
-        self._border_index = (self._border_index + 1) % len(BORDER_COLORS)
+        self._border_index = (self._border_index + 1) % len(
+            _get_glow_colors(self._theme, self._section, BORDER_COLORS)
+        )
         self._draw_surface()
         self._border_job = self.after(420, self._animate_border)
 
@@ -318,7 +373,10 @@ class NeonSlider(tk.Canvas):
         resolution: float = 1,
         **kwargs,
     ):
-        background = kwargs.pop("background", PANEL)
+        self._theme = kwargs.pop("theme", None)
+        self._section = kwargs.pop("section", None)
+        colors = _get_colors(self._theme, self._section)
+        background = kwargs.pop("background", colors["panel"])
         parent_background = master.cget("background")
         super().__init__(
             master,
@@ -347,7 +405,7 @@ class NeonSlider(tk.Canvas):
             self._content_frame,
             text=f"{initial:g}",
             background=background,
-            foreground=CYAN,
+            foreground=colors["accent"],
             font=(tkfont.nametofont("TkFixedFont").actual("family"), 10, "bold"),
             width=6,
             anchor="e",
@@ -356,7 +414,7 @@ class NeonSlider(tk.Canvas):
             self._content_frame,
             text=label,
             background=background,
-            foreground=TEXT,
+            foreground=colors["text"],
             anchor="w",
         ).grid(row=0, column=0, sticky="ew")
         self._value_label.grid(row=0, column=1, sticky="e")
@@ -369,9 +427,9 @@ class NeonSlider(tk.Canvas):
             showvalue=False,
             command=self._on_change,
             background=background,
-            foreground=TEXT,
-            activebackground=PURPLE,
-            troughcolor="#26334d",
+            foreground=colors["text"],
+            activebackground=colors["accent_alt"],
+            troughcolor=colors["track"],
             highlightthickness=0,
             bd=0,
             sliderlength=18,
@@ -401,7 +459,9 @@ class NeonSlider(tk.Canvas):
     def _animate_glow(self) -> None:
         if not self.winfo_exists():
             return
-        self._color_index = (self._color_index + 1) % len(SLIDER_COLORS)
+        self._color_index = (self._color_index + 1) % len(
+            _get_glow_colors(self._theme, self._section, SLIDER_COLORS)
+        )
         self._draw_surface()
         self._glow_job = self.after(360, self._animate_glow)
 
@@ -412,7 +472,8 @@ class NeonSlider(tk.Canvas):
             return
         self.delete("surface")
         for depth, inset in enumerate((0, 1, 3)):
-            color = SLIDER_COLORS[(self._color_index + depth * 2) % len(SLIDER_COLORS)]
+            glow_colors = _get_glow_colors(self._theme, self._section, SLIDER_COLORS)
+            color = glow_colors[(self._color_index + depth * 2) % len(glow_colors)]
             _draw_rounded_rect(self, inset, inset, width - inset - 1, height - inset - 1, 13, color)
         _draw_rounded_rect(self, 5, 5, width - 6, height - 6, 10, self._panel_background)
         self.coords(self._content_window, 9, 8)

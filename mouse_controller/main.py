@@ -12,11 +12,12 @@ from pynput.mouse import Controller
 
 from auto_clicker import AutoClicker
 from hotkeys import HotkeyManager
-from neon_theme import BACKGROUND, CYAN, ERROR, MUTED, PANEL, TEXT, WARNING
 from neon_widgets import NeonBorderFrame, NeonGlowButton, NeonSlider, NeonToggle
 from path_canvas import PathCanvas
 from path_follower import PathFollower
 from shapes import ShapePaths
+from theme_editor import AppearanceEditor
+from theme_manager import ThemeManager
 from updater import GitHubUpdater
 
 Point = Tuple[int, int]
@@ -28,10 +29,11 @@ class NeonMouseControllerApp:
 
     def __init__(self, root: tk.Tk):
         self.root = root
+        self.theme = ThemeManager()
         self.root.title("Neon Mouse Controller")
         self.root.geometry("860x840")
         self.root.minsize(700, 740)
-        self.root.configure(background=BACKGROUND)
+        self.root.configure(background=self.theme.colors()["background"])
         self.root.protocol("WM_DELETE_WINDOW", self.close)
 
         self._mouse = Controller()
@@ -47,7 +49,7 @@ class NeonMouseControllerApp:
         self.path_follower = PathFollower(self._record_expected_position)
 
         self._build_ui()
-        self._set_status("Ready. Activate from a toggle or hotkey.", MUTED)
+        self._set_status("Ready. Activate from a toggle or hotkey.")
         self.hotkeys = HotkeyManager(
             on_auto_toggle=lambda: self.root.after(0, self._toggle_auto_from_hotkey),
             on_path_toggle=lambda: self.root.after(0, self._toggle_path_from_hotkey),
@@ -60,20 +62,22 @@ class NeonMouseControllerApp:
         try:
             self.hotkeys.start()
         except Exception as error:
-            self._set_status(f"Global hotkeys unavailable: {error}", WARNING)
+            self._set_status(f"Global hotkeys unavailable: {error}", self._theme_color("warning"))
         self.root.after(100, self._monitor_mouse)
 
     def _build_ui(self) -> None:
-        container = tk.Frame(self.root, background=BACKGROUND, padx=18, pady=16)
+        colors = self.theme.colors()
+        self._container = tk.Frame(self.root, background=colors["background"], padx=18, pady=16)
+        container = self._container
         container.pack(fill=tk.BOTH, expand=True)
 
-        header = tk.Frame(container, background=BACKGROUND)
+        header = tk.Frame(container, background=colors["background"])
         header.pack(fill=tk.X, pady=(0, 14))
         tk.Label(
             header,
             text="NEON MOUSE CONTROLLER",
-            background=BACKGROUND,
-            foreground=CYAN,
+            background=colors["background"],
+            foreground=colors["accent"],
             font=("TkDefaultFont", 17, "bold"),
         ).pack(anchor="w")
         tk.Label(
@@ -83,24 +87,38 @@ class NeonMouseControllerApp:
                 "Ctrl+Alt+Num1 circle  |  Ctrl+Alt+Num2 triangle  |  "
                 "Ctrl+Alt+Num3 square  |  Ctrl+Alt+Num4 random"
             ),
-            background=BACKGROUND,
-            foreground=MUTED,
+            background=colors["background"],
+            foreground=colors["muted"],
             font=("TkDefaultFont", 9),
             wraplength=810,
             justify=tk.LEFT,
         ).pack(anchor="w", pady=(4, 0))
+        NeonGlowButton(
+            header,
+            "Appearance",
+            command=self._open_appearance,
+            theme=self.theme,
+            width=142,
+        ).pack(side=tk.RIGHT, anchor="ne")
 
-        controls = tk.Frame(container, background=BACKGROUND)
+        controls = tk.Frame(container, background=colors["background"])
         controls.pack(fill=tk.X)
         controls.columnconfigure(0, weight=1, uniform="controls")
         controls.columnconfigure(1, weight=1, uniform="controls")
 
-        click_section = NeonBorderFrame(controls, "Auto Clicker")
+        click_colors = self.theme.colors("clicker")
+        click_section = NeonBorderFrame(controls, "Auto Clicker", theme=self.theme, section="clicker")
         click_section.grid(row=0, column=0, sticky="nsew", padx=(0, 7), pady=(0, 12))
-        click_row = tk.Frame(click_section.content, background=PANEL)
+        click_row = tk.Frame(click_section.content, background=click_colors["panel"])
         click_row.pack(fill=tk.X, pady=(0, 10))
-        tk.Label(click_row, text="Clicking", background=PANEL, foreground=TEXT).pack(side=tk.LEFT)
-        self.click_toggle = NeonToggle(click_row, command=self._on_click_toggle)
+        tk.Label(click_row, text="Clicking", background=click_colors["panel"], foreground=click_colors["text"]).pack(side=tk.LEFT)
+        self.click_toggle = NeonToggle(
+            click_row,
+            command=self._on_click_toggle,
+            theme=self.theme,
+            section="clicker",
+            style=self.theme.toggle_style,
+        )
         self.click_toggle.pack(side=tk.RIGHT)
         self.click_speed = NeonSlider(
             click_section.content,
@@ -109,15 +127,24 @@ class NeonMouseControllerApp:
             1000,
             8,
             command=self.auto_clicker.set_speed,
+            theme=self.theme,
+            section="clicker",
         )
         self.click_speed.pack(fill=tk.X)
 
-        path_section = NeonBorderFrame(controls, "Path Follower")
+        path_colors = self.theme.colors("path")
+        path_section = NeonBorderFrame(controls, "Path Follower", theme=self.theme, section="path")
         path_section.grid(row=0, column=1, sticky="nsew", padx=(7, 0), pady=(0, 12))
-        path_row = tk.Frame(path_section.content, background=PANEL)
+        path_row = tk.Frame(path_section.content, background=path_colors["panel"])
         path_row.pack(fill=tk.X, pady=(0, 10))
-        tk.Label(path_row, text="Following", background=PANEL, foreground=TEXT).pack(side=tk.LEFT)
-        self.path_toggle = NeonToggle(path_row, command=self._on_path_toggle)
+        tk.Label(path_row, text="Following", background=path_colors["panel"], foreground=path_colors["text"]).pack(side=tk.LEFT)
+        self.path_toggle = NeonToggle(
+            path_row,
+            command=self._on_path_toggle,
+            theme=self.theme,
+            section="path",
+            style=self.theme.toggle_style,
+        )
         self.path_toggle.pack(side=tk.RIGHT)
         self.path_speed = NeonSlider(
             path_section.content,
@@ -127,6 +154,8 @@ class NeonMouseControllerApp:
             700,
             command=self.path_follower.set_speed,
             resolution=50,
+            theme=self.theme,
+            section="path",
         )
         self.path_speed.pack(fill=tk.X, pady=(0, 10))
         max_shape_size = max(
@@ -140,9 +169,11 @@ class NeonMouseControllerApp:
             max_shape_size,
             min(240, max_shape_size),
             resolution=20,
+            theme=self.theme,
+            section="path",
         )
         self.shape_size.pack(fill=tk.X, pady=(0, 10))
-        shape_row = tk.Frame(path_section.content, background=PANEL)
+        shape_row = tk.Frame(path_section.content, background=path_colors["panel"])
         shape_row.pack(fill=tk.X)
         for name, shape in (
             ("Circle", ShapePaths.circle),
@@ -158,39 +189,46 @@ class NeonMouseControllerApp:
                     if shape is None
                     else lambda shape=shape, name=name: self._use_shape(shape, name)
                 ),
+                theme=self.theme,
+                section="path",
             ).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=3)
 
-        draw_section = NeonBorderFrame(container, "Custom Path Canvas")
+        canvas_colors = self.theme.colors("canvas")
+        draw_section = NeonBorderFrame(container, "Custom Path Canvas", theme=self.theme, section="canvas")
         draw_section.pack(fill=tk.BOTH, expand=True)
         tk.Label(
             draw_section.content,
             text="Draw a stroke; its canvas position will scale across the full display.",
-            background=PANEL,
-            foreground=MUTED,
+            background=canvas_colors["panel"],
+            foreground=canvas_colors["muted"],
             anchor="w",
         ).pack(fill=tk.X, pady=(0, 8))
-        self.path_canvas = PathCanvas(draw_section.content)
+        self.path_canvas = PathCanvas(draw_section.content, theme=self.theme)
         self.path_canvas.pack(fill=tk.BOTH, expand=True)
-        canvas_buttons = tk.Frame(draw_section.content, background=PANEL)
+        canvas_buttons = tk.Frame(draw_section.content, background=canvas_colors["panel"])
         canvas_buttons.pack(fill=tk.X, pady=(10, 0))
         NeonGlowButton(
             canvas_buttons,
             "Use Drawn Path",
             command=self._use_drawn_path,
+            theme=self.theme,
+            section="canvas",
         ).pack(side=tk.LEFT)
         NeonGlowButton(
             canvas_buttons,
             "Clear",
             command=self.path_canvas.clear,
+            theme=self.theme,
+            section="canvas",
         ).pack(side=tk.LEFT, padx=(8, 0))
 
-        footer = tk.Frame(container, background=BACKGROUND)
+        footer = tk.Frame(container, background=colors["background"])
         footer.pack(fill=tk.X, pady=(12, 0))
         self.status_label = tk.Label(
             footer,
             text="",
-            background=BACKGROUND,
-            foreground=MUTED,
+            background=colors["background"],
+            foreground=colors["muted"],
             anchor="w",
             font=("TkDefaultFont", 9),
             wraplength=710,
@@ -201,14 +239,37 @@ class NeonMouseControllerApp:
             "Update & Restart",
             command=self._start_update,
             width=150,
+            theme=self.theme,
         ).pack(side=tk.RIGHT, padx=(8, 0))
-        NeonGlowButton(footer, "Stop All", command=lambda: self._stop_all("Stopped by user.")).pack(side=tk.RIGHT)
+        NeonGlowButton(
+            footer,
+            "Stop All",
+            command=lambda: self._stop_all("Stopped by user."),
+            theme=self.theme,
+        ).pack(side=tk.RIGHT)
+
+    def _open_appearance(self) -> None:
+        existing = getattr(self, "_appearance_editor", None)
+        if existing is not None and existing.window.winfo_exists():
+            existing.window.lift()
+            return
+        self._appearance_editor = AppearanceEditor(self.root, self.theme, self._apply_theme)
+
+    def _apply_theme(self) -> None:
+        self.root.configure(background=self.theme.colors()["background"])
+        if self._container.winfo_exists():
+            self._container.destroy()
+        self._build_ui()
+        self._set_status("Appearance updated.")
+
+    def _theme_color(self, key: str, section: Optional[str] = None) -> str:
+        return self.theme.colors(section)[key]
 
     def _start_update(self) -> None:
         if self._updating:
             return
         self._updating = True
-        self._stop_all("Updating from GitHub. Mouse actions are stopped.", MUTED)
+        self._stop_all("Updating from GitHub. Mouse actions are stopped.", self._theme_color("muted"))
         self._updater_thread = threading.Thread(
             target=self._run_update,
             name="neon-github-updater",
@@ -234,13 +295,13 @@ class NeonMouseControllerApp:
 
     def _queue_update_status(self, message: str) -> None:
         try:
-            self.root.after(0, lambda message=message: self._set_status(message, CYAN))
+            self.root.after(0, lambda message=message: self._set_status(message, self._theme_color("accent")))
         except tk.TclError:
             pass
 
     def _update_failed(self, error: Exception) -> None:
         self._updating = False
-        self._set_status(f"Update failed: {error}", ERROR)
+        self._set_status(f"Update failed: {error}", self._theme_color("error"))
 
     def _restart_after_update(self) -> None:
         app_path = Path(__file__).resolve()
@@ -249,7 +310,7 @@ class NeonMouseControllerApp:
             subprocess.Popen([sys.executable, str(app_path)], cwd=install_root)
         except OSError as error:
             self._updating = False
-            self._set_status(f"Updated successfully; close and reopen the app: {error}", WARNING)
+            self._set_status(f"Updated successfully; close and reopen the app: {error}", self._theme_color("warning"))
             return
         self.close()
 
@@ -270,10 +331,13 @@ class NeonMouseControllerApp:
                 (self.path_follower.running and expected_distance > 35)
             )
             if user_moved:
-                    self._stop_all("Mouse moved. Motion stopped; reactivate from the UI or a hotkey.", WARNING)
+                    self._stop_all(
+                        "Mouse moved. Motion stopped; reactivate from the UI or a hotkey.",
+                        self._theme_color("warning"),
+                    )
             self._last_observed = current
         except Exception as error:
-            self._set_status(f"Mouse monitor error: {error}", ERROR)
+            self._set_status(f"Mouse monitor error: {error}", self._theme_color("error"))
         self.root.after(100, self._monitor_mouse)
 
     def _on_click_toggle(self, enabled: bool) -> None:
@@ -284,19 +348,19 @@ class NeonMouseControllerApp:
                 cursor = self._mouse.position
                 self._last_observed = (int(cursor[0]), int(cursor[1]))
                 self._expected_position = self._last_observed
-                self._set_status("Auto-clicker active. Move the mouse to disengage.", CYAN)
+                self._set_status("Auto-clicker active. Move the mouse to disengage.", self._theme_color("accent"))
             else:
                 self.click_toggle.set(False)
-                self._set_status("Clicker is stopping; try again in a moment.", WARNING)
+                self._set_status("Clicker is stopping; try again in a moment.", self._theme_color("warning"))
         else:
             self.auto_clicker.stop()
-            self._set_status("Auto-clicker stopped.", MUTED)
+            self._set_status("Auto-clicker stopped.")
 
     def _on_path_toggle(self, enabled: bool) -> None:
         if enabled:
             if not self._selected_path:
                 self.path_toggle.set(False)
-                self._set_status("Choose a built-in shape or draw a path first.", WARNING)
+                self._set_status("Choose a built-in shape or draw a path first.", self._theme_color("warning"))
                 return
             self.auto_clicker.stop()
             self.click_toggle.set(False)
@@ -305,13 +369,13 @@ class NeonMouseControllerApp:
                 cursor = self._mouse.position
                 self._last_observed = (int(cursor[0]), int(cursor[1]))
                 self._expected_position = self._last_observed
-                self._set_status("Path follower active. Move the mouse to disengage.", CYAN)
+                self._set_status("Path follower active. Move the mouse to disengage.", self._theme_color("accent"))
             else:
                 self.path_toggle.set(False)
-                self._set_status("Path follower is stopping; try again in a moment.", WARNING)
+                self._set_status("Path follower is stopping; try again in a moment.", self._theme_color("warning"))
         else:
             self.path_follower.stop()
-            self._set_status("Path follower stopped.", MUTED)
+            self._set_status("Path follower stopped.")
 
     def _path_for_activation(self) -> List[Point]:
         if not self._selected_path:
@@ -335,7 +399,7 @@ class NeonMouseControllerApp:
         shape_dimension = shape_size // 2 if name == "Circle" else shape_size
         self._selected_path = shape(shape_dimension)
         self._selected_path_relative = True
-        self._set_status(f"{name} path selected ({shape_size}px). Starting its path.", CYAN)
+        self._set_status(f"{name} path selected ({shape_size}px). Starting its path.", self._theme_color("accent"))
         self._start_selected_path()
 
     def _use_random_path(self) -> None:
@@ -344,7 +408,7 @@ class NeonMouseControllerApp:
             self.root.winfo_screenheight(),
         )
         self._selected_path_relative = False
-        self._set_status("Random full-screen path selected. Starting its path.", CYAN)
+        self._set_status("Random full-screen path selected. Starting its path.", self._theme_color("accent"))
         self._start_selected_path()
 
     def _start_selected_path(self) -> None:
@@ -361,11 +425,11 @@ class NeonMouseControllerApp:
             self.root.winfo_screenheight(),
         )
         if len(path) < 2:
-            self._set_status("Draw a path with at least two points first.", WARNING)
+            self._set_status("Draw a path with at least two points first.", self._theme_color("warning"))
             return
         self._selected_path = list(path)
         self._selected_path_relative = False
-        self._set_status("Custom full-screen path selected. Starting its path.", CYAN)
+        self._set_status("Custom full-screen path selected. Starting its path.", self._theme_color("accent"))
         self._start_selected_path()
 
     def _toggle_auto_from_hotkey(self) -> None:
@@ -378,16 +442,16 @@ class NeonMouseControllerApp:
         self.path_follower.stop()
         self.path_toggle.set(False)
 
-    def _stop_all(self, message: str, color=MUTED) -> None:
+    def _stop_all(self, message: str, color: Optional[str] = None) -> None:
         self.auto_clicker.stop()
         self.path_follower.stop()
         self.click_toggle.set(False)
         self.path_toggle.set(False)
         self._set_status(message, color)
 
-    def _set_status(self, message: str, color: str) -> None:
+    def _set_status(self, message: str, color: Optional[str] = None) -> None:
         if self.status_label.winfo_exists():
-            self.status_label.configure(text=message, foreground=color)
+            self.status_label.configure(text=message, foreground=color or self._theme_color("muted"))
 
     def close(self) -> None:
         if self._closing:

@@ -15,6 +15,10 @@ On first launch, the launcher creates a private `.venv` folder beside the app an
 
 To update an existing copy, click **Update & Restart** in the app. It downloads the latest files from the GitHub `main` branch, updates dependencies, and restarts the application. Keep an internet connection available and do not move or delete the extracted folder while updating.
 
+If your installed copy does not yet show **Appearance**, click **Update & Restart** once. The new editor and reset option will be available after the updated app reopens.
+
+Open **Appearance** in the main window to choose a preset, switch between light and dark mode, customize the surface and frame color for each section, change the drawing color, or select an XP, Pill, or Minimal toggle style. **Reset to Windows XP** restores the default theme and clears custom colors. Appearance choices are saved in your user settings folder and remain available after app updates.
+
 If macOS asks for permission, allow Accessibility/Input Monitoring for the terminal or Python process. On Linux, Tkinter may need to be installed separately (for example, `sudo apt install python3-tk` on Ubuntu/Debian); global input control works best under X11 and may be restricted by Wayland. Run the launcher in a graphical desktop session, not a headless server.
 
 ## Use
@@ -24,6 +28,7 @@ If macOS asks for permission, allow Accessibility/Input Monitoring for the termi
 - Draw a stroke and select **Use Drawn Path** to scale it across the full display. **Random** generates a screen-wide random route. Adjust movement speed with its slider.
 - Press **Ctrl+Alt+A** to toggle the clicker, **Ctrl+Alt+P** to toggle path following, or **Ctrl+Alt+S** to stop all activity.
 - Press **Ctrl+Alt+Num1** for Circle, **Ctrl+Alt+Num2** for Triangle, **Ctrl+Alt+Num3** for Square, or **Ctrl+Alt+Num4** for Random. Enable Num Lock when using the numeric keypad.
+- Use **Appearance** to change the visual theme; changes apply immediately and persist between launches.
 - Moving the mouse manually disengages the active action. Reactivate it from the UI or a hotkey.
 
 The two movement modes cannot run at the same time. Use the **Stop All** button or the stop hotkey whenever you need to halt activity immediately.
