@@ -1,7 +1,11 @@
 """Entry point and application controller for Neon Mouse Controller."""
 
 import tkinter as tk
+import subprocess
+import sys
+import threading
 from tkinter import messagebox
+from pathlib import Path
 from typing import Callable, List, Optional, Tuple
 
 from pynput.mouse import Controller
@@ -13,6 +17,7 @@ from neon_widgets import NeonBorderFrame, NeonGlowButton, NeonSlider, NeonToggle
 from path_canvas import PathCanvas
 from path_follower import PathFollower
 from shapes import ShapePaths
+from updater import GitHubUpdater
 
 Point = Tuple[int, int]
 ShapeFactory = Callable[..., List[Point]]
@@ -36,6 +41,7 @@ class NeonMouseControllerApp:
         self._selected_path: Optional[List[Point]] = None
         self._selected_path_relative = False
         self._closing = False
+        self._updating = False
 
         self.auto_clicker = AutoClicker()
         self.path_follower = PathFollower(self._record_expected_position)
@@ -100,7 +106,7 @@ class NeonMouseControllerApp:
             click_section.content,
             "Clicks per second",
             1,
-            30,
+            1000,
             8,
             command=self.auto_clicker.set_speed,
         )
@@ -190,7 +196,62 @@ class NeonMouseControllerApp:
             wraplength=710,
         )
         self.status_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        NeonGlowButton(
+            footer,
+            "Update & Restart",
+            command=self._start_update,
+            width=150,
+        ).pack(side=tk.RIGHT, padx=(8, 0))
         NeonGlowButton(footer, "Stop All", command=lambda: self._stop_all("Stopped by user.")).pack(side=tk.RIGHT)
+
+    def _start_update(self) -> None:
+        if self._updating:
+            return
+        self._updating = True
+        self._stop_all("Updating from GitHub. Mouse actions are stopped.", MUTED)
+        self._updater_thread = threading.Thread(
+            target=self._run_update,
+            name="neon-github-updater",
+            daemon=True,
+        )
+        self._updater_thread.start()
+
+    def _run_update(self) -> None:
+        install_root = Path(__file__).resolve().parent.parent
+        updater = GitHubUpdater(install_root, self._queue_update_status)
+        try:
+            updater.update()
+        except Exception as error:
+            try:
+                self.root.after(0, lambda error=error: self._update_failed(error))
+            except tk.TclError:
+                pass
+        else:
+            try:
+                self.root.after(0, self._restart_after_update)
+            except tk.TclError:
+                pass
+
+    def _queue_update_status(self, message: str) -> None:
+        try:
+            self.root.after(0, lambda message=message: self._set_status(message, CYAN))
+        except tk.TclError:
+            pass
+
+    def _update_failed(self, error: Exception) -> None:
+        self._updating = False
+        self._set_status(f"Update failed: {error}", ERROR)
+
+    def _restart_after_update(self) -> None:
+        app_path = Path(__file__).resolve()
+        install_root = app_path.parent.parent
+        try:
+            subprocess.Popen([sys.executable, str(app_path)], cwd=install_root)
+        except OSError as error:
+            self._updating = False
+            self._set_status(f"Updated successfully; close and reopen the app: {error}", WARNING)
+            return
+        self.close()
 
     def _record_expected_position(self, point: Point) -> None:
         self._expected_position = (int(point[0]), int(point[1]))
