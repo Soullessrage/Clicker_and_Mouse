@@ -168,6 +168,9 @@ class NeonGlowButton(tk.Canvas):
     def _animate_glow(self) -> None:
         if not self.winfo_exists():
             return
+        if self._theme is not None and not self._theme.animations_enabled:
+            self._draw()
+            return
         self._glow_index = (self._glow_index + 1) % len(_get_glow_colors(self._theme, self._section, BUTTON_COLORS))
         self._draw()
         self._glow_job = self.after(240, self._animate_glow)
@@ -298,6 +301,8 @@ class NeonToggle(tk.Canvas):
     def _animate(self) -> None:
         if not self.winfo_exists():
             return
+        if self._theme is not None and not self._theme.animations_enabled:
+            return
         if self._value and self._enabled:
             glow_colors = _get_glow_colors(self._theme, self._section, SLIDER_COLORS)
             self._pulse_index = (self._pulse_index + 1) % len(glow_colors)
@@ -419,6 +424,9 @@ class NeonBorderFrame(tk.Canvas):
     def _animate_border(self) -> None:
         if not self.winfo_exists():
             return
+        if self._theme is not None and not self._theme.animations_enabled:
+            self._draw_surface()
+            return
         self._border_index = (self._border_index + 1) % len(
             _get_glow_colors(self._theme, self._section, BORDER_COLORS)
         )
@@ -534,6 +542,9 @@ class NeonSlider(tk.Canvas):
 
     def _animate_glow(self) -> None:
         if not self.winfo_exists():
+            return
+        if self._theme is not None and not self._theme.animations_enabled:
+            self._draw_surface()
             return
         self._color_index = (self._color_index + 1) % len(
             _get_glow_colors(self._theme, self._section, SLIDER_COLORS)

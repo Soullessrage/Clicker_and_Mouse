@@ -27,6 +27,7 @@ class AppearanceEditor:
         self.toggle_var = tk.StringVar(value=self.theme.toggle_style)
         self.box_var = tk.StringVar(value=self.theme.box_style)
         self.font_var = tk.StringVar(value=self.theme.font_family)
+        self.animations_var = tk.BooleanVar(value=self.theme.animations_enabled)
         self._build()
         self._refresh_swatches()
         self.window.grab_set()
@@ -158,6 +159,21 @@ class AppearanceEditor:
         font_box.pack(side=tk.RIGHT)
         font_box.bind("<<ComboboxSelected>>", self._on_font_family)
 
+        animations = tk.Checkbutton(
+            outer,
+            text="Animate glow and flashing accents",
+            variable=self.animations_var,
+            command=self._on_animations_changed,
+            background=colors["background"],
+            foreground=colors["text"],
+            activebackground=colors["background"],
+            activeforeground=colors["accent"],
+            selectcolor=colors["panel"],
+            font=self._font(10),
+            anchor="w",
+        )
+        animations.pack(fill=tk.X, pady=(8, 0))
+
         self._section = tk.Frame(
             outer,
             background=colors["panel"],
@@ -274,6 +290,10 @@ class AppearanceEditor:
         self.theme.set_font_family(self.font_var.get())
         self._apply()
 
+    def _on_animations_changed(self) -> None:
+        self.theme.set_animations_enabled(self.animations_var.get())
+        self._apply()
+
     def _choose_section_color(self, key: str) -> None:
         section = SECTIONS[self.section_var.get()]
         current = self.theme.colors(section)[key]
@@ -320,6 +340,7 @@ class AppearanceEditor:
         self.toggle_var.set(self.theme.toggle_style)
         self.box_var.set(self.theme.box_style)
         self.font_var.set(self.theme.font_family)
+        self.animations_var.set(self.theme.animations_enabled)
         for child in self.window.winfo_children():
             child.destroy()
         self._build()
@@ -339,6 +360,7 @@ class AppearanceEditor:
         self.toggle_var.set(self.theme.toggle_style)
         self.box_var.set(self.theme.box_style)
         self.font_var.set(self.theme.font_family)
+        self.animations_var.set(self.theme.animations_enabled)
         self._refresh_swatches()
         self._apply()
 

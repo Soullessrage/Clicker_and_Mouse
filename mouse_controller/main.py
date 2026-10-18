@@ -13,6 +13,7 @@ from pynput.mouse import Controller
 
 from auto_clicker import AutoClicker
 from hotkeys import HotkeyManager
+from notes_window import GameNotesWindow
 from neon_widgets import NeonBorderFrame, NeonGlowButton, NeonSlider, NeonToggle
 from path_canvas import PathCanvas
 from path_follower import PathFollower
@@ -94,6 +95,13 @@ class NeonMouseControllerApp:
             wraplength=810,
             justify=tk.LEFT,
         ).pack(anchor="w", pady=(4, 0))
+        NeonGlowButton(
+            header,
+            "Game Notes",
+            command=self._open_game_notes,
+            theme=self.theme,
+            width=136,
+        ).pack(side=tk.RIGHT, anchor="ne", padx=(0, 8))
         NeonGlowButton(
             header,
             "Appearance",
@@ -268,6 +276,13 @@ class NeonMouseControllerApp:
             existing.window.lift()
             return
         self._appearance_editor = AppearanceEditor(self.root, self.theme, self._apply_theme)
+
+    def _open_game_notes(self) -> None:
+        existing = getattr(self, "_game_notes_window", None)
+        if existing is not None and existing.window.winfo_exists():
+            existing.window.lift()
+            return
+        self._game_notes_window = GameNotesWindow(self.root, self.theme)
 
     def _apply_theme(self) -> None:
         self.root.configure(background=self.theme.colors()["background"])

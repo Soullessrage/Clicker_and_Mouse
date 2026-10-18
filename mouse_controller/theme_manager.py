@@ -94,6 +94,7 @@ class ThemeManager:
             "toggle_style": "XP",
             "box_style": "Windows XP",
             "font_family": "System Default",
+            "animations_enabled": True,
             "section_overrides": {},
             "path_color": None,
         }
@@ -128,6 +129,10 @@ class ThemeManager:
     @property
     def font_family(self) -> str:
         return self.settings["font_family"]
+
+    @property
+    def animations_enabled(self) -> bool:
+        return self.settings["animations_enabled"]
 
     def colors(self, section: Optional[str] = None) -> ColorMap:
         colors = dict(PRESETS[self.preset][self.mode])
@@ -188,6 +193,10 @@ class ThemeManager:
         self.settings["font_family"] = family
         self.save()
 
+    def set_animations_enabled(self, enabled: bool) -> None:
+        self.settings["animations_enabled"] = bool(enabled)
+        self.save()
+
     def set_section_color(self, section: str, key: str, color: str) -> None:
         if section not in SECTIONS.values() or key not in ("panel", "accent"):
             raise ValueError("Choose a valid box and either its surface or frame color")
@@ -207,6 +216,7 @@ class ThemeManager:
             "toggle_style": "XP",
             "box_style": "Windows XP",
             "font_family": "System Default",
+            "animations_enabled": True,
             "section_overrides": {},
             "path_color": None,
         }
@@ -230,6 +240,7 @@ class ThemeManager:
         style = saved.get("toggle_style")
         box_style = saved.get("box_style")
         font_family = saved.get("font_family")
+        animations_enabled = saved.get("animations_enabled")
         if preset in PRESETS:
             self.settings["preset"] = preset
         if mode in ("light", "dark"):
@@ -240,6 +251,8 @@ class ThemeManager:
             self.settings["box_style"] = box_style
         if isinstance(font_family, str) and font_family.strip() and len(font_family) <= 64:
             self.settings["font_family"] = font_family.strip()
+        if isinstance(animations_enabled, bool):
+            self.settings["animations_enabled"] = animations_enabled
         saved_overrides = saved.get("section_overrides", {})
         if not isinstance(saved_overrides, dict):
             saved_overrides = {}
