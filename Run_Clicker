@@ -1,0 +1,35 @@
+#!/bin/sh
+
+set -u
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)" || exit 1
+cd "$SCRIPT_DIR" || exit 1
+
+PYTHON="${PYTHON:-python3}"
+VENV_PYTHON="$SCRIPT_DIR/.venv/bin/python"
+
+fail() {
+    printf '\nRun_Clicker: %s\n' "$1" >&2
+    printf 'Press Enter to close this window.' >&2
+    read -r _
+    exit 1
+}
+
+if ! command -v "$PYTHON" >/dev/null 2>&1; then
+    fail "Python 3 was not found. Install Python 3.10 or newer, then click Run_Clicker again."
+fi
+
+if ! "$PYTHON" -c 'import tkinter' >/dev/null 2>&1; then
+    fail "Tkinter is missing. Install the Tkinter package for your Python installation, then try again."
+fi
+
+if [ ! -x "$VENV_PYTHON" ]; then
+    printf 'Preparing the app environment (first launch only)...\n'
+    "$PYTHON" -m venv "$SCRIPT_DIR/.venv" || fail "Could not create the local Python environment."
+fi
+
+if ! "$VENV_PYTHON" -c 'import pynput' >/dev/null 2>&1; then
+    printf 'Installing app dependencies (internet connection required)...\n'
+    "$VENV_PYTHON" -m pip install -r "$SCRIPT_DIR/requirements.txt" || fail "Dependency installation failed. Check your internet connection and try again."
+fi
+
+exec "$VENV_PYTHON" "$SCRIPT_DIR/mouse_controller/main.py" "$@"

@@ -2,50 +2,18 @@
 
 A desktop mouse auto-clicker and path follower with a neon-themed Tkinter interface. The app starts only when activated from its UI or a hotkey, and stops its active action when it detects manual mouse movement.
 
-## Download and install
+## Download and launch
 
-1. On GitHub, select **Code** → **Download ZIP**.
-2. Extract the ZIP file. Open a terminal (PowerShell on Windows) in the extracted `Clicker_and_Mouse` folder, the one containing this README and `requirements.txt`.
-3. Install Python 3.10 or later if it is not already installed.
-4. Create and activate a virtual environment, then install the dependency:
+1. On GitHub, select **Code** → **Download ZIP**, then extract the ZIP.
+2. Make sure Python 3.10 or newer is installed. On Windows, use the standard installer from [python.org](https://www.python.org/downloads/) and include Tcl/Tk. On macOS or Linux, use a desktop Python installation that includes Tkinter.
+3. Double-click the launcher for your computer:
+   - **Windows:** `Run_Clicker.bat`
+   - **macOS:** `Run_Clicker.command`
+   - **Linux:** `Run_Clicker`
 
-**Windows PowerShell**
+On first launch, the launcher creates a private `.venv` folder beside the app and installs its Python dependency. An internet connection is needed for this one-time setup. Later launches open the app directly. Keep the extracted folder in a location where your account can create files; the app stores its environment in `.venv` there.
 
-```powershell
-py -m venv .venv
-.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-```
-
-If PowerShell blocks virtual-environment activation, run `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` in that terminal, then activate again.
-
-**macOS or Linux**
-
-```sh
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
-```
-
-On Linux, install your distribution's Tkinter package if Python reports that `tkinter` is missing (for example, `sudo apt install python3-tk` on Ubuntu/Debian).
-
-## Run
-
-From the extracted project folder, with the virtual environment activated:
-
-**Windows PowerShell**
-
-```powershell
-python mouse_controller\main.py
-```
-
-**macOS or Linux**
-
-```sh
-./run_mouse_controller
-```
-
-Alternatively, run `python3 mouse_controller/main.py` on macOS or Linux. Keep the app in a graphical desktop session; a headless terminal or server does not provide the display needed by Tkinter and `pynput`. On macOS, grant Accessibility/Input Monitoring permission to the terminal or Python process if prompted. Linux desktop support depends on the session; `pynput` generally works best under X11, while Wayland may restrict global input control.
+If macOS asks for permission, allow Accessibility/Input Monitoring for the terminal or Python process. On Linux, Tkinter may need to be installed separately (for example, `sudo apt install python3-tk` on Ubuntu/Debian); global input control works best under X11 and may be restricted by Wayland. Run the launcher in a graphical desktop session, not a headless server.
 
 ## Use
 
