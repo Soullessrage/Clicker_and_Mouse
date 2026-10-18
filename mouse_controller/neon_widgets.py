@@ -5,11 +5,9 @@ from tkinter import font as tkfont
 from typing import Callable, Optional
 
 from neon_theme import (
-    BACKGROUND,
     BORDER_COLORS,
     BUTTON_COLORS,
     CYAN,
-    CYAN_DIM,
     MUTED,
     PANEL,
     PANEL_HIGHLIGHT,
@@ -19,7 +17,18 @@ from neon_theme import (
 )
 
 
-class NeonGlowButton(tk.Button):
+def _make_glow_layers(master: tk.Misc, palette: tuple[str, ...]):
+    layers = []
+    parent = master
+    for index in range(3):
+        layer = tk.Frame(parent, background=palette[index])
+        layer.pack(fill=tk.BOTH, expand=True, padx=1 if index else 0, pady=1 if index else 0)
+        layers.append(layer)
+        parent = layer
+    return parent, layers
+
+
+class NeonGlowButton(tk.Frame):
     """A flat button whose border color softly cycles while it is visible."""
 
     def __init__(self, master: tk.Misc, text: str, command: Callable[[], None], **kwargs):
@@ -28,6 +37,12 @@ class NeonGlowButton(tk.Button):
         self._normal_background = kwargs.pop("background", PANEL_HIGHLIGHT)
         super().__init__(
             master,
+            background=self._normal_background,
+            highlightthickness=0,
+        )
+        button_parent, self._glow_layers = _make_glow_layers(self, BORDER_COLORS)
+        self.button = tk.Button(
+            button_parent,
             text=text,
             command=command,
             background=self._normal_background,
@@ -37,32 +52,34 @@ class NeonGlowButton(tk.Button):
             disabledforeground=MUTED,
             relief=tk.FLAT,
             borderwidth=0,
-            highlightthickness=2,
-            highlightbackground=CYAN_DIM,
-            highlightcolor=CYAN,
             padx=12,
             pady=8,
             cursor="hand2",
             font=(tkfont.nametofont("TkDefaultFont").actual("family"), 10, "bold"),
             **kwargs,
         )
-        self.bind("<Enter>", self._on_enter, add="+")
-        self.bind("<Leave>", self._on_leave, add="+")
+        self.button.pack(fill=tk.BOTH, expand=True, padx=1, pady=1)
+        for widget in [self.button, *self._glow_layers]:
+            widget.bind("<Enter>", self._on_enter, add="+")
+            widget.bind("<Leave>", self._on_leave, add="+")
         self.bind("<Destroy>", self._on_destroy, add="+")
         self._animate_glow()
 
     def _animate_glow(self) -> None:
         if not self.winfo_exists():
             return
-        self.configure(highlightbackground=BUTTON_COLORS[self._glow_index])
+        palette = BUTTON_COLORS
+        for depth, layer in enumerate(self._glow_layers):
+            color_index = min(self._glow_index + depth, len(palette) - 1)
+            layer.configure(background=palette[color_index])
         self._glow_index = (self._glow_index + 1) % len(BUTTON_COLORS)
-        self._glow_job = self.after(240, self._animate_glow)
+        self._glow_job = self.after(130, self._animate_glow)
 
     def _on_enter(self, _event: tk.Event) -> None:
-        self.configure(background=PURPLE)
+        self.button.configure(background=PURPLE)
 
     def _on_leave(self, _event: tk.Event) -> None:
-        self.configure(background=self._normal_background)
+        self.button.configure(background=self._normal_background)
 
     def _on_destroy(self, _event: tk.Event) -> None:
         if self._glow_job is not None:
@@ -171,12 +188,13 @@ class NeonBorderFrame(tk.Frame):
 
     def __init__(self, master: tk.Misc, title: str, **kwargs):
         background = kwargs.pop("background", PANEL)
-        super().__init__(master, background=background, highlightthickness=2, **kwargs)
+        super().__init__(master, background=background, highlightthickness=0, **kwargs)
         self._border_index = 0
         self._border_job: Optional[str] = None
-        self.configure(highlightbackground=CYAN_DIM, highlightcolor=CYAN)
+        content_parent, self._glow_layers = _make_glow_layers(self, BORDER_COLORS)
+        content_parent.configure(background=background)
         self.title_label = tk.Label(
-            self,
+            content_parent,
             text=title.upper(),
             background=background,
             foreground=CYAN,
@@ -186,7 +204,7 @@ class NeonBorderFrame(tk.Frame):
             pady=9,
         )
         self.title_label.pack(fill=tk.X)
-        self.content = tk.Frame(self, background=background, padx=12, pady=8)
+        self.content = tk.Frame(content_parent, background=background, padx=12, pady=8)
         self.content.pack(fill=tk.BOTH, expand=True)
         self.bind("<Destroy>", self._on_destroy, add="+")
         self._animate_border()
@@ -194,9 +212,11 @@ class NeonBorderFrame(tk.Frame):
     def _animate_border(self) -> None:
         if not self.winfo_exists():
             return
-        self.configure(highlightbackground=BORDER_COLORS[self._border_index])
+        for depth, layer in enumerate(self._glow_layers):
+            color_index = min(self._border_index + depth, len(BORDER_COLORS) - 1)
+            layer.configure(background=BORDER_COLORS[color_index])
         self._border_index = (self._border_index + 1) % len(BORDER_COLORS)
-        self._border_job = self.after(300, self._animate_border)
+        self._border_job = self.after(150, self._animate_border)
 
     def _on_destroy(self, _event: tk.Event) -> None:
         if self._border_job is not None:
@@ -221,12 +241,14 @@ class NeonSlider(tk.Frame):
         **kwargs,
     ):
         background = kwargs.pop("background", PANEL)
-        super().__init__(master, background=background, highlightthickness=1, **kwargs)
+        super().__init__(master, background=background, highlightthickness=0, **kwargs)
         self._color_index = 0
         self._glow_job: Optional[str] = None
         self._command = command
+        content_parent, self._glow_layers = _make_glow_layers(self, SLIDER_COLORS)
+        content_parent.configure(background=background)
         self._value_label = tk.Label(
-            self,
+            content_parent,
             text=f"{initial:g}",
             background=background,
             foreground=CYAN,
@@ -235,7 +257,7 @@ class NeonSlider(tk.Frame):
             anchor="e",
         )
         tk.Label(
-            self,
+            content_parent,
             text=label,
             background=background,
             foreground=TEXT,
@@ -261,7 +283,7 @@ class NeonSlider(tk.Frame):
             cursor="hand2",
         )
         self.scale.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(3, 0))
-        self.columnconfigure(0, weight=1)
+        content_parent.columnconfigure(0, weight=1)
         self.scale.set(initial)
         self.bind("<Destroy>", self._on_destroy, add="+")
         self._animate_glow()
@@ -281,9 +303,11 @@ class NeonSlider(tk.Frame):
     def _animate_glow(self) -> None:
         if not self.winfo_exists():
             return
-        self.configure(highlightbackground=SLIDER_COLORS[self._color_index])
+        for depth, layer in enumerate(self._glow_layers):
+            color_index = min(self._color_index + depth, len(SLIDER_COLORS) - 1)
+            layer.configure(background=SLIDER_COLORS[color_index])
         self._color_index = (self._color_index + 1) % len(SLIDER_COLORS)
-        self._glow_job = self.after(280, self._animate_glow)
+        self._glow_job = self.after(140, self._animate_glow)
 
     def _on_destroy(self, _event: tk.Event) -> None:
         if self._glow_job is not None:

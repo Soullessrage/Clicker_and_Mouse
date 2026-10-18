@@ -2,7 +2,7 @@
 
 import tkinter as tk
 from tkinter import messagebox
-from typing import List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
 from pynput.mouse import Controller
 
@@ -15,6 +15,7 @@ from path_follower import PathFollower
 from shapes import ShapePaths
 
 Point = Tuple[int, int]
+ShapeFactory = Callable[..., List[Point]]
 
 
 class NeonMouseControllerApp:
@@ -23,8 +24,8 @@ class NeonMouseControllerApp:
     def __init__(self, root: tk.Tk):
         self.root = root
         self.root.title("Neon Mouse Controller")
-        self.root.geometry("760x780")
-        self.root.minsize(620, 680)
+        self.root.geometry("860x840")
+        self.root.minsize(700, 740)
         self.root.configure(background=BACKGROUND)
         self.root.protocol("WM_DELETE_WINDOW", self.close)
 
@@ -45,6 +46,10 @@ class NeonMouseControllerApp:
             on_auto_toggle=lambda: self.root.after(0, self._toggle_auto_from_hotkey),
             on_path_toggle=lambda: self.root.after(0, self._toggle_path_from_hotkey),
             on_stop=lambda: self.root.after(0, lambda: self._stop_all("Stopped by hotkey.")),
+            on_circle=lambda: self.root.after(0, lambda: self._use_shape(ShapePaths.circle, "Circle")),
+            on_triangle=lambda: self.root.after(0, lambda: self._use_shape(ShapePaths.triangle, "Triangle")),
+            on_square=lambda: self.root.after(0, lambda: self._use_shape(ShapePaths.square, "Square")),
+            on_random=lambda: self.root.after(0, self._use_random_path),
         )
         try:
             self.hotkeys.start()
@@ -67,10 +72,16 @@ class NeonMouseControllerApp:
         ).pack(anchor="w")
         tk.Label(
             header,
-            text="Global controls: Ctrl+Alt+A  clicker   |   Ctrl+Alt+P  path   |   Ctrl+Alt+S  stop all",
+            text=(
+                "Ctrl+Alt+A clicker  |  Ctrl+Alt+P path  |  Ctrl+Alt+S stop\n"
+                "Ctrl+Alt+Num1 circle  |  Ctrl+Alt+Num2 triangle  |  "
+                "Ctrl+Alt+Num3 square  |  Ctrl+Alt+Num4 random"
+            ),
             background=BACKGROUND,
             foreground=MUTED,
             font=("TkDefaultFont", 9),
+            wraplength=810,
+            justify=tk.LEFT,
         ).pack(anchor="w", pady=(4, 0))
 
         controls = tk.Frame(container, background=BACKGROUND)
@@ -112,24 +123,42 @@ class NeonMouseControllerApp:
             resolution=50,
         )
         self.path_speed.pack(fill=tk.X, pady=(0, 10))
+        max_shape_size = max(
+            160,
+            min(1000, min(self.root.winfo_screenwidth(), self.root.winfo_screenheight()) - 32),
+        )
+        self.shape_size = NeonSlider(
+            path_section.content,
+            "Shape size (px)",
+            80,
+            max_shape_size,
+            min(240, max_shape_size),
+            resolution=20,
+        )
+        self.shape_size.pack(fill=tk.X, pady=(0, 10))
         shape_row = tk.Frame(path_section.content, background=PANEL)
         shape_row.pack(fill=tk.X)
         for name, shape in (
             ("Circle", ShapePaths.circle),
-            ("Square", ShapePaths.square),
             ("Triangle", ShapePaths.triangle),
+            ("Square", ShapePaths.square),
+            ("Random", None),
         ):
             NeonGlowButton(
                 shape_row,
                 name,
-                command=lambda shape=shape, name=name: self._use_shape(shape, name),
+                command=(
+                    self._use_random_path
+                    if shape is None
+                    else lambda shape=shape, name=name: self._use_shape(shape, name)
+                ),
             ).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=3)
 
         draw_section = NeonBorderFrame(container, "Custom Path Canvas")
         draw_section.pack(fill=tk.BOTH, expand=True)
         tk.Label(
             draw_section.content,
-            text="Draw a continuous stroke, then use it as a screen path.",
+            text="Draw a stroke; its canvas position will scale across the full display.",
             background=PANEL,
             foreground=MUTED,
             anchor="w",
@@ -161,7 +190,7 @@ class NeonMouseControllerApp:
             wraplength=710,
         )
         self.status_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        NeonGlowButton(footer, "Stop All", command=lambda: self._stop_all("Stopped by user." )).pack(side=tk.RIGHT)
+        NeonGlowButton(footer, "Stop All", command=lambda: self._stop_all("Stopped by user.")).pack(side=tk.RIGHT)
 
     def _record_expected_position(self, point: Point) -> None:
         self._expected_position = (int(point[0]), int(point[1]))
@@ -230,23 +259,53 @@ class NeonMouseControllerApp:
             return list(self._selected_path)
         position = self._mouse.position
         center_x, center_y = int(position[0]), int(position[1])
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        min_x = min(point[0] for point in self._selected_path)
+        max_x = max(point[0] for point in self._selected_path)
+        min_y = min(point[1] for point in self._selected_path)
+        max_y = max(point[1] for point in self._selected_path)
+        center_x = min(max(center_x, -min_x), screen_width - 1 - max_x)
+        center_y = min(max(center_y, -min_y), screen_height - 1 - max_y)
         return [(center_x + x, center_y + y) for x, y in self._selected_path]
 
-    def _use_shape(self, shape, name: str) -> None:
-        self._selected_path = shape()
+    def _use_shape(self, shape: ShapeFactory, name: str) -> None:
+        shape_size = int(self.shape_size.get())
+        shape_dimension = shape_size // 2 if name == "Circle" else shape_size
+        self._selected_path = shape(shape_dimension)
         self._selected_path_relative = True
-        self._set_status(f"{name} selected. Starting its path.", CYAN)
-        self.path_toggle.set(True, notify=True)
+        self._set_status(f"{name} path selected ({shape_size}px). Starting its path.", CYAN)
+        self._start_selected_path()
+
+    def _use_random_path(self) -> None:
+        self._selected_path = ShapePaths.random_path(
+            self.root.winfo_screenwidth(),
+            self.root.winfo_screenheight(),
+        )
+        self._selected_path_relative = False
+        self._set_status("Random full-screen path selected. Starting its path.", CYAN)
+        self._start_selected_path()
+
+    def _start_selected_path(self) -> None:
+        if self.path_follower.running or self.path_toggle.get():
+            self.path_follower.stop()
+            self.path_toggle.set(False)
+            self.root.after(100, lambda: self.path_toggle.set(True, notify=True))
+        else:
+            self.path_toggle.set(True, notify=True)
 
     def _use_drawn_path(self) -> None:
-        path = self.path_canvas.get_screen_path()
+        path = self.path_canvas.get_screen_path(
+            self.root.winfo_screenwidth(),
+            self.root.winfo_screenheight(),
+        )
         if len(path) < 2:
             self._set_status("Draw a path with at least two points first.", WARNING)
             return
         self._selected_path = list(path)
         self._selected_path_relative = False
-        self._set_status("Custom path selected. Starting its path.", CYAN)
-        self.path_toggle.set(True, notify=True)
+        self._set_status("Custom full-screen path selected. Starting its path.", CYAN)
+        self._start_selected_path()
 
     def _toggle_auto_from_hotkey(self) -> None:
         self.click_toggle.set(not self.click_toggle.get(), notify=True)

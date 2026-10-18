@@ -1,6 +1,7 @@
 """Mathematical generators for reusable built-in paths."""
 
 import math
+import random
 from typing import List, Tuple
 
 Point = Tuple[int, int]
@@ -56,4 +57,21 @@ class ShapePaths:
                     round(start[1] + (end[1] - start[1]) * fraction),
                 ))
         points.append((round(corners[-1][0]), round(corners[-1][1])))
+        return points
+
+    @staticmethod
+    def random_path(width: int, height: int, waypoints: int = 32, margin: int = 24) -> List[Point]:
+        """Generate random screen positions for a continuously looping path."""
+        if width < 1 or height < 1 or waypoints < 2:
+            raise ValueError("A random path requires a positive screen size and at least two waypoints")
+        safe_margin = max(0, min(margin, (width - 1) // 2, (height - 1) // 2))
+        random_source = random.SystemRandom()
+        points = [
+            (
+                random_source.randint(safe_margin, max(safe_margin, width - 1 - safe_margin)),
+                random_source.randint(safe_margin, max(safe_margin, height - 1 - safe_margin)),
+            )
+            for _ in range(waypoints)
+        ]
+        points.append(points[0])
         return points

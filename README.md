@@ -18,9 +18,10 @@ If macOS asks for permission, allow Accessibility/Input Monitoring for the termi
 ## Use
 
 - Toggle **Auto Clicker** to start or stop clicking; adjust clicks per second with its slider.
-- Choose **Circle**, **Square**, or **Triangle** to start following that path around the current pointer position.
-- Draw a stroke on the canvas and select **Use Drawn Path** to follow it. Adjust movement speed with the path slider.
+- Adjust **Shape size** to set the circle diameter or the square/triangle side length, then choose **Circle**, **Triangle**, or **Square** to follow it near the current pointer position.
+- Draw a stroke and select **Use Drawn Path** to scale it across the full display. **Random** generates a screen-wide random route. Adjust movement speed with its slider.
 - Press **Ctrl+Alt+A** to toggle the clicker, **Ctrl+Alt+P** to toggle path following, or **Ctrl+Alt+S** to stop all activity.
+- Press **Ctrl+Alt+Num1** for Circle, **Ctrl+Alt+Num2** for Triangle, **Ctrl+Alt+Num3** for Square, or **Ctrl+Alt+Num4** for Random. Enable Num Lock when using the numeric keypad.
 - Moving the mouse manually disengages the active action. Reactivate it from the UI or a hotkey.
 
 The two movement modes cannot run at the same time. Use the **Stop All** button or the stop hotkey whenever you need to halt activity immediately.

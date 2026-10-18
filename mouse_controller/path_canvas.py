@@ -36,12 +36,21 @@ class PathCanvas(tk.Frame):
         self._drawing = False
         self.canvas.delete("stroke")
 
-    def get_screen_path(self) -> List[Point]:
+    def get_screen_path(self, screen_width: int, screen_height: int) -> List[Point]:
+        """Scale the drawn stroke to cover the full primary display."""
         if not self.has_path:
             return []
-        origin_x = self.canvas.winfo_rootx()
-        origin_y = self.canvas.winfo_rooty()
-        return [(origin_x + x, origin_y + y) for x, y in self._points]
+        canvas_width = max(1, self.canvas.winfo_width() - 1)
+        canvas_height = max(1, self.canvas.winfo_height() - 1)
+        display_width = max(1, screen_width - 1)
+        display_height = max(1, screen_height - 1)
+        return [
+            (
+                min(display_width, max(0, round(x * display_width / canvas_width))),
+                min(display_height, max(0, round(y * display_height / canvas_height))),
+            )
+            for x, y in self._points
+        ]
 
     def _begin_stroke(self, event: tk.Event) -> None:
         self.clear()
